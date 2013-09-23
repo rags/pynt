@@ -100,9 +100,9 @@ __DEFAULT__=start_server
 The command line interface and help is automatically generated. Task descriptions
 are extracted from function docstrings.
 
-```bash    
+```bash
 $ pynt -h
-usage: b [-h] [-l] [-v] [-f file] [task [task ...]]
+usage: pynt [-h] [-l] [-v] [-f file] [task [task ...]]
 
 positional arguments:
   task                  perform specified task and all its dependencies

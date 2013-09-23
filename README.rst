@@ -108,7 +108,7 @@ descriptions are extracted from function docstrings.
 ::
 
     $ pynt -h
-    usage: b [-h] [-l] [-v] [-f file] [task [task ...]]
+    usage: pynt [-h] [-l] [-v] [-f file] [task [task ...]]
 
     positional arguments:
       task                  perform specified task and all its dependencies
