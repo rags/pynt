@@ -162,7 +162,7 @@ def _run(module, logger, task, completed_tasks, from_command_line = False, args 
     # Satsify dependencies recursively. Maintain set of completed tasks so each
     # task is only performed once.
     for dependency in task.dependencies:
-        completed_tasks = _run(module,logger,dependency,completed_tasks)
+        completed_tasks = _run(module,logger,dependency,completed_tasks, from_command_line=False, args=args, kwargs=kwargs)
 
     # Perform current task, if need to.
     if from_command_line or task not in completed_tasks:
