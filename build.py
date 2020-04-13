@@ -1,5 +1,7 @@
 #!/usr/bin/python
 
+from __future__ import print_function
+
 import subprocess
 from pynt import task
 
@@ -15,8 +17,23 @@ def test(*args):
     """
     Run unit tests.
     """
-    subprocess.call(["py.test-2.7"] + list(args))
-    subprocess.call(["py.test-3.3"] + list(args))
+    try:
+        subprocess.call(["py.test-2.7"] + list(args))
+    except FileNotFoundError:
+        print("py.test-2.7 not found, trying generic name")
+    try:
+        subprocess.call(["py.test"] + list(args))
+    except FileNotFoundError:
+        print("py.test not found")
+    try:
+        subprocess.call(["py.test-3.3"] + list(args))
+    except FileNotFoundError:
+        print("py.test-3.3 not found, trying generic name")
+    try:
+        subprocess.call(["py.test3"] + list(args))
+    except FileNotFoundError:
+        print("py.test3 not found")
+
 
 @task()
 def generate_rst():
