@@ -92,6 +92,12 @@ def _load_buildscript(file_path):
     with open(file_path, 'r') as script_file:
         return imp.load_module(module_name, script_file, file_path, description)
 
+def _match_task_names_heuristically(module) -> bool:
+    for name, value in inspect.getmembers(module, lambda v: isinstance(v, str)):
+        if name == '__TASK_NAME_RESOLVER__':
+            return value.strip().lower() != 'strict'
+    return True
+
 def _get_default_task(module):
     matching_tasks = [task for name,task in inspect.getmembers(module,Task.is_task)
                       if name == "__DEFAULT__"]
@@ -130,17 +136,18 @@ def _get_task(module, name, tasks):
     args, kwargs= _parse_args(args_str)
     if hasattr(module, task_name):
         return getattr(module, task_name), args, kwargs
-    matching_tasks = [task for task in tasks if task.name.startswith(task_name)]
-        
-    if not matching_tasks:
-        raise Exception("Invalid task '%s'. Task should be one of %s" %
-                        (name, 
-                         ', '.join([task.name for task in tasks])))
-    if len(matching_tasks) == 1:
-        return matching_tasks[0], args, kwargs
-    raise Exception("Conflicting matches %s for task %s" % (
-        ', '.join([task.name for task in matching_tasks]), task_name
-    ))
+
+    if _match_task_names_heuristically(module):
+        matching_tasks = [task for task in tasks if task.name.startswith(task_name)]
+        if len(matching_tasks) == 1:
+            return matching_tasks[0], args, kwargs
+        elif len(matching_tasks) > 1:
+            raise Exception("Conflicting matches %s for task %s" % (
+                ', '.join([task.name for task in matching_tasks]), task_name
+            ))
+    raise Exception("Invalid task '%s'. Task should be one of %s" %
+            (name, 
+            ', '.join([task.name for task in tasks])))
 
 def _parse_args(args_str):
     args = []

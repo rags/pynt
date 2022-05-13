@@ -203,6 +203,24 @@ class TestPartialTaskNames:
                 'Conflicting matches copy_file, clean for task c' in str(exc.value))
 
 
+class TestStrictTaskNames:
+
+    def setup_method(self):
+        from .build_scripts import build_with_strict_task_names
+        self._mod = build_with_strict_task_names
+
+    def test_task_resolver_statement(self):
+        assert False == _pynt._match_task_names_heuristically(self._mod)
+        
+    def test_exception_on_partial_task_name(self):
+        with pytest.raises(Exception) as exc:
+            build(self._mod, ["c"])
+        assert 'Invalid task \'c\'' in str(exc.value)
+
+    def test_with_valid_task_name_and_dependencies(self):
+        mod = build(self._mod, ["html"])
+        assert ['clean[/tmp]','html'] ==  mod.tasks_run
+
 
 class TestDefaultTask:
         def test_simple_default_task(self):

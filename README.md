@@ -92,6 +92,11 @@ def echo(*args,**kwargs):
     print args
     print kwargs
     
+# You can optionally enforce strict task name matching; if left out, the first
+# few characters of the task name are enough to execute the task, as long as
+# the partial name is unambigious
+# __TASK_NAME_RESOLVER__ = 'strict'
+
 # Default task (if specified) is run when no task is specified in the command line
 # make sure you define the variable __DEFAULT__ after the task is defined
 # A good convention is to define it at the end of the module
@@ -151,7 +156,9 @@ Starting server at localhost:80
 [ example.py - Completed task "start_server" ]
 ```
 
-The first few characters of the task name is enough to execute the task, as long as the partial name is unambigious. You can specify multiple tasks to run in the commandline. Again the dependencies are taken taken care of.
+The first few characters of the task name are enough to execute the task, as long as the partial name is unambigious. This behaviour can be disabled by adding the statement `__TASK_NAME_RESOLVER__ = 'strict'` to your build file.
+
+You can specify multiple tasks to run in the commandline. Again the dependencies are taken taken care of.
 
 ```bash
 $ pynt cle ht cl
