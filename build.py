@@ -15,8 +15,7 @@ def test(*args):
     """
     Run unit tests.
     """
-    subprocess.call(["py.test-2.7"] + list(args))
-    subprocess.call(["py.test-3.3"] + list(args))
+    subprocess.call(["pytest"] + list(args))
 
 @task()
 def generate_rst():

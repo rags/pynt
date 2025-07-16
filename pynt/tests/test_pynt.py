@@ -9,31 +9,26 @@ else:
 
 import os
 from os import path
-import imp
+try:
+    import imp
+except ImportError:
+    import importlib as imp
 
 def fpath(mod):
     return path.splitext(mod.__file__)[0] + '.py'
 
     
 def simulate_dynamic_module_load(mod):
-    file_path = fpath(mod)
-
-    #sys.path.append(path.abspath(script_dir))
-
-    module_name, suffix = path.splitext(path.basename(file_path))
-    description = (suffix, 'r', imp.PY_SOURCE)
-
-    with open(file_path, 'r') as scriptfile:
-        return imp.load_module(module_name, scriptfile, file_path, description)
+    return mod
 
 def reset_build_file(mod):
     mod.tasks_run = []
 def build(mod, params=None, init_mod = reset_build_file):
-    dynamically_loaded_mod = simulate_dynamic_module_load(mod)
-    dynamically_loaded_mod.tasks_run = []
+    tasks_run = []
     sys.argv = ['pynt', '-f', fpath(mod)] + (params or [])
-    main()
-    return dynamically_loaded_mod
+    main(tasks_run)
+    mod.tasks_run = tasks_run
+    return mod
 
 class TestParseArgs:
     def test_parsing_commandline(self):
@@ -93,7 +88,7 @@ class TestBuildWithDependencies:
         module = build(default_task_and_import_dependencies,
                        ["task_with_imported_dependencies"], init_mod = mod_init)
         assert module.tasks_run == ['local_task', 'task_with_imported_dependencies']
-        assert module.build_with_params.tasks_run == ['clean[/tmp]', 'html']
+        assert module.build_with_params.tasks_run == ["clean['/tmp']", 'html']
 
 class TestDecorationValidation:
 
@@ -169,9 +164,8 @@ class TestRuntimeError:
         from .build_scripts import runtime_error as re
         with pytest.raises(IOError):
             build(re,["android"])
-        mod = simulate_dynamic_module_load(re)
-        assert mod.ran_images
-        assert not hasattr(mod, 'ran_android')
+        assert hasattr(re, 'ran_images')
+        assert not hasattr(re, 'ran_android')
         
     def test_exception_on_invalid_task_name(self):
         from .build_scripts import build_with_params
@@ -190,11 +184,11 @@ class TestPartialTaskNames:
         
     def test_with_partial_name(self):
         mod = build(self._mod, ["cl"])
-        assert ['clean[/tmp]'] ==  mod.tasks_run
+        assert ["clean['/tmp']"] ==  mod.tasks_run
         
     def test_with_partial_name_and_dependencies(self):
         mod = build(self._mod, ["htm"])
-        assert ['clean[/tmp]','html'] ==  mod.tasks_run
+        assert ["clean['/tmp']",'html'] ==  mod.tasks_run
 
     def test_exception_on_conflicting_partial_names(self):
         with pytest.raises(Exception) as exc:
@@ -223,10 +217,10 @@ class TestMultipleTasks:
 
     def test_dependency_is_run_only_once_unless_explicitly_invoked_again(self):
         mod = build(self._mod, ["clean", "html", 'tests', "clean"])
-        assert ['clean[/tmp]', "html", "tests[]", "clean[/tmp]"] == mod.tasks_run
+        assert ["clean['/tmp']", "html", "tests[]", "clean['/tmp']"] == mod.tasks_run
         
     def test_multiple_partial_names(self):
-        assert ['clean[/tmp]', "html"] == build(self._mod, ["cl", "htm"]).tasks_run
+        assert ["clean['/tmp']", "html"] == build(self._mod, ["cl", "htm"]).tasks_run
 
 
 
@@ -237,39 +231,39 @@ class TesttaskArguments:
         self._mod.tasks_run = []
 
     def test_passing_optional_params_with_dependencies(self):
-        mod = build(self._mod, ["clean[~/project/foo]",
-                                     'append_to_file[/foo/bar,ABCDEF]',
-                                     "copy_file[/foo/bar,/foo/blah,False]",
-                                     'start_server[8080]'])
-        assert ["clean[~/project/foo]",  'append_to_file[/foo/bar,ABCDEF]', 
-                "copy_file[/foo/bar,/foo/blah,False]", 'start_server[8080,True]'
+        mod = build(self._mod, ["clean['~/project/foo']",
+                                     "append_to_file['/foo/bar','ABCDEF']",
+                                     "copy_file['/foo/bar','/foo/blah',False]",
+                                     "start_server[8080]"])
+        assert ["clean['~/project/foo']",  "append_to_file['/foo/bar','ABCDEF']",
+                "copy_file['/foo/bar','/foo/blah',False]", "start_server[8080,True]"
             ] == mod.tasks_run
         
     def test_invoking_varargs_task(self):
-        mod = build(self._mod, ['tests[test1,test2,test3]'])
-        assert ['tests[test1,test2,test3]'] == mod.tasks_run
+        mod = build(self._mod, ["tests['test1','test2','test3']"])
+        assert ["tests['test1','test2','test3']"] == mod.tasks_run
 
     def test_partial_name_with_args(self):
 
-        mod = build(self._mod, ['co[foo,bar]','star'])
-        assert ['clean[/tmp]','copy_file[foo,bar,True]', 'start_server[80,True]'
+        mod = build(self._mod, ["co['foo','bar']",'star'])
+        assert ["clean['/tmp']","copy_file['foo','bar',True]", "start_server[80,True]"
             ] == mod.tasks_run
 
 
     def test_passing_keyword_args(self):
-        mod = build(self._mod, ['co[to=bar,from_=foo]','star[80,debug=False]', 'echo[foo=bar,blah=123]'])
+        mod = build(self._mod, ["co[to='bar',from_='foo']",'star[80,debug=False]', "echo[foo='bar',blah=123]"])
 
-        assert ['clean[/tmp]','copy_file[foo,bar,True]',
-                'start_server[80,False]',
-                'echo[blah=123,foo=bar]'] == mod.tasks_run
+        assert ["clean['/tmp']","copy_file['foo','bar',True]",
+                "start_server[80,False]",
+                "echo[blah=123,foo='bar']"] == mod.tasks_run
 
 
 
     def test_passing_varargs_and_keyword_args(self):
-        assert (['echo[1,2,3,some_str,111=333,bar=123.3,foo=xyz]']
+        assert (["echo[1,2,3,'some_str',111=333,bar=123.3,foo='xyz']"]
                 ==  
                 build(self._mod,
-                      ['echo[1,2,3,some_str,111=333,foo=xyz,bar=123.3]']
+                      ["echo[1,2,3,'some_str',111=333,foo='xyz',bar=123.3]"]
                   ).tasks_run)
 
     def test_validate_keyword_arguments_always_after_args(self):
@@ -311,3 +305,18 @@ class TesttaskLocalImports:
 
     def test_load_build_with_local_import_does_not_fail(self):
         mod = build(self._mod, ["work"])
+
+
+class TestArgumentEvaluation:
+    def setup_method(self, method):
+        from .build_scripts import build_with_params
+        self._mod = build_with_params
+        self._mod.tasks_run = []
+
+    def test_argument_evaluation(self):
+        mod = build(self._mod, ['echo[1, "2", 3.0, "str"]'])
+        assert mod.tasks_run[0] == "echo[1,'2',3.0,'str']"
+
+    def test_command_injection(self):
+        mod = build(self._mod, ['echo[__import__("os").system("echo pwned")]'])
+        assert mod.tasks_run[0] == "echo['__import__(\"os\").system(\"echo pwned\")']"

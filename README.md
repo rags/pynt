@@ -170,6 +170,36 @@ The 'html' task dependency 'clean' is run only once. But clean can be explicitly
 
 pynt tasks can accept parameters from commandline.
 
+**Security Warning**
+--------------------
+
+Pynt passes arguments as string, without any sanitization. If you are using pynt
+to execute shell commands, you are responsible for sanitizing the arguments to
+prevent command injection attacks. For example, if you have a task that executes
+a command with an argument, like this:
+
+```python
+@task()
+def execute(command):
+    os.system("echo " + command)
+```
+
+A malicious user could run `pynt 'execute[; rm -rf /]'`, which would delete the
+entire filesystem.
+
+To prevent this, you should sanitize the arguments before using them. For example,
+you could use `shlex.quote` to escape any special characters:
+
+```python
+import shlex
+from pynt import task
+import os
+
+@task()
+def execute(command):
+    os.system("echo " + shlex.quote(command))
+```
+
 ```bash
 $ pynt "copy_file[/path/to/foo, path_to_bar]"
 [ example.py - Starting task "clean" ]

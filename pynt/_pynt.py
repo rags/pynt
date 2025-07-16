@@ -9,7 +9,10 @@ import logging
 import os
 from os import path
 import re
-import imp
+try:
+    import imp
+except ImportError:
+    import importlib as imp
 import sys
 from pynt import __version__
 
@@ -17,7 +20,7 @@ _CREDIT_LINE = "Powered by pynt %s - A Lightweight Python Build Tool." % __versi
 _LOGGING_FORMAT = "[ %(name)s - %(message)s ]"
 _TASK_PATTERN = re.compile("^([^\[]+)(\[([^\]]*)\])?$")
 #"^([^\[]+)(\[([^\],=]*(,[^\],=]+)*(,[^\],=]+=[^\],=]+)*)\])?$"
-def build(args):
+def build(args, tasks_run=None):
     """
     Build the specified module with specified arguments.
     
@@ -41,6 +44,8 @@ def build(args):
         
     #load build file as a module
     module = _load_buildscript(args.file)
+    if tasks_run is not None:
+        module.tasks_run = tasks_run
     
     # Run task and all its dependencies.
     if args.list_tasks:
@@ -77,7 +82,7 @@ def print_tasks(module, file):
 
 def _load_buildscript(file_path):
     if not path.isfile(file_path):
-        print("Build file '%s' does not exist. Please specify a build file\n" % file_path) 
+        print("Build file '%s' does not exist. Please specify a build file\n" % file_path)
         parser.print_help()
         sys.exit(1)
 
@@ -87,10 +92,20 @@ def _load_buildscript(file_path):
     sys.path.append(path.abspath(script_dir))
 
     module_name, suffix = path.splitext(script_base)
-    description = (suffix, 'r', imp.PY_SOURCE)
-
-    with open(file_path, 'r') as script_file:
-        return imp.load_module(module_name, script_file, file_path, description)
+    if suffix == '.py':
+        try:
+            spec = imp.util.spec_from_file_location(module_name, file_path)
+            module = imp.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+            return module
+        except (AttributeError, ImportError): # fallback for python2
+            description = (suffix, 'r', imp.PY_SOURCE)
+            with open(file_path, 'r') as script_file:
+                return imp.load_module(module_name, script_file, file_path, description)
+    else:
+        description = (suffix, 'r', imp.PY_SOURCE)
+        with open(file_path, 'r') as script_file:
+            return imp.load_module(module_name, script_file, file_path, description)
 
 def _get_default_task(module):
     matching_tasks = [task for name,task in inspect.getmembers(module,Task.is_task)
@@ -142,6 +157,8 @@ def _get_task(module, name, tasks):
         ', '.join([task.name for task in matching_tasks]), task_name
     ))
 
+import ast
+
 def _parse_args(args_str):
     args = []
     kwargs = {}
@@ -154,13 +171,20 @@ def _parse_args(args_str):
             key, value = [_str.strip() for _str in part.split("=")]
             if key in kwargs:
                 raise Exception("duplicate keyword argument %s" % part)
-            kwargs[key] = value
+            kwargs[key] = _evaluate(value)
         else:
             if len(kwargs) > 0:
                 raise Exception("Non keyword arg %s cannot follows a keyword arg %s"
                                 % (part, arg_parts[i - 1]))
-            args.append(part.strip())
+            args.append(_evaluate(part.strip()))
     return args, kwargs
+
+def _evaluate(value):
+    try:
+        return ast.literal_eval(value)
+    except (ValueError, SyntaxError):
+        # Fallback to string.
+        return value
     
 def _run(module, logger, task, completed_tasks, from_command_line = False, args = None, kwargs = None):
     """
@@ -306,5 +330,5 @@ def _get_logger(module):
 
     return logger
 
-def main():
-    build(sys.argv[1:])
+def main(tasks_run=None):
+    build(sys.argv[1:], tasks_run)
